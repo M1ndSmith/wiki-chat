@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wikipedia Chatbot</title>
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --bg-color: #f5f5f5;
+            --message-bg-user: #e3f2fd;
+            --message-bg-bot: #ffffff;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--bg-color);
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .chat-container {
+            max-width: 900px;
+            margin: 2rem auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .chat-header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .messages {
+            height: 500px;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 1rem;
+            border-radius: 12px;
+            position: relative;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .user-message {
+            background: var(--message-bg-user);
+            align-self: flex-end;
+            margin-left: 20%;
+        }
+
+        .bot-message {
+            background: var(--message-bg-bot);
+            align-self: flex-start;
+            margin-right: 20%;
+            border: 1px solid #e0e0e0;
+        }
+
+        .input-container {
+            padding: 1rem;
+            background: #fff;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .input-container textarea {
+            flex: 1;
+            padding: 0.75rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            resize: none;
+            font-family: inherit;
+            font-size: 1rem;
+            line-height: 1.5;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-container textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+
+        .send-button {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+        }
+
+        .send-button:hover {
+            background-color: #1976D2;
+        }
+
+        .send-button:disabled {
+            background-color: #bdbdbd;
+            cursor: not-allowed;
+        }
+
+        .thinking {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .thinking-dots {
+            display: flex;
+            gap: 0.25rem;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        @media (max-width: 768px) {
+            .chat-container {
+                margin: 0;
+                height: 100vh;
+                border-radius: 0;
+            }
+
+            .messages {
+                height: calc(100vh - 140px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>Wikipedia Research Assistant</h1>
+        </div>
+
+        <div id="messages" class="messages"></div>
+
+        <div class="input-container">
+            <textarea 
+                id="userInput" 
+                rows="2" 
+                placeholder="Ask me anything..."
+                maxlength="500"
+            ></textarea>
+            <button id="sendBtn" class="send-button">Send</button>
+        </div>
+    </div>
+
+    <script>
+        class ChatUI {
+            constructor() {
+                this.messagesDiv = document.getElementById("messages");
+                this.sendBtn = document.getElementById("sendBtn");
+                this.userInput = document.getElementById("userInput");
+                this.sessionId = this.generateSessionId();
+                this.isProcessing = false;
+
+                this.setupEventListeners();
+            }
+
+            generateSessionId() {
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    const r = Math.random() * 16 | 0;
+                    const v = c == 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
+            }
+
+            setupEventListeners() {
+                this.sendBtn.addEventListener("click", () => this.handleSend());
+                this.userInput.addEventListener("keypress", (e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        this.handleSend();
+                    }
+                });
+                this.userInput.addEventListener("input", () => {
+                    this.sendBtn.disabled = !this.userInput.value.trim();
+                });
+            }
+
+            async handleSend() {
+                if (this.isProcessing || !this.userInput.value.trim()) return;
+
+                const userMessage = this.userInput.value.trim();
+                this.addMessage(userMessage, "user");
+                this.userInput.value = "";
+                this.sendBtn.disabled = true;
+                this.isProcessing = true;
+
+                const thinkingMessage = this.addThinkingMessage();
+
+                try {
+                    const response = await this.sendMessage(userMessage);
+                    this.removeMessage(thinkingMessage);
+                    
+                    let finalContent = "No response generated.";
+                    for (const chunk of response) {
+                        if (chunk.agent?.messages) {
+                            const lastMessage = chunk.agent.messages[chunk.agent.messages.length - 1];
+                            if (lastMessage?.content) {
+                                finalContent = lastMessage.content;
+                            }
+                        }
+                    }
+                    
+                    this.addMessage(finalContent, "bot");
+                } catch (error) {
+                    this.removeMessage(thinkingMessage);
+                    this.addMessage("Sorry, I encountered an error. Please try again.", "bot");
+                    console.error("Error:", error);
+                }
+
+                this.isProcessing = false;
+                this.sendBtn.disabled = false;
+                this.userInput.focus();
+            }
+
+            addMessage(content, type) {
+                const messageDiv = document.createElement("div");
+                messageDiv.classList.add("message", `${type}-message`);
+                messageDiv.textContent = content;
+                this.messagesDiv.appendChild(messageDiv);
+                this.scrollToBottom();
+                return messageDiv;
+            }
+
+            addThinkingMessage() {
+                const messageDiv = document.createElement("div");
+                messageDiv.classList.add("message", "bot-message", "thinking");
+                messageDiv.innerHTML = `
+                    Thinking
+                    <div class="thinking-dots">
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                    </div>
+                `;
+                this.messagesDiv.appendChild(messageDiv);
+                this.scrollToBottom();
+                return messageDiv;
+            }
+
+            removeMessage(messageDiv) {
+                if (messageDiv && messageDiv.parentNode) {
+                    messageDiv.parentNode.removeChild(messageDiv);
+                }
+            }
+
+            scrollToBottom() {
+                this.messagesDiv.scrollTop = this.messagesDiv.scrollHeight;
+            }
+
+            async sendMessage(message) {
+                const response = await fetch("/chat", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Session-ID": this.sessionId
+                    },
+                    body: JSON.stringify({ message })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                return await response.json();
+            }
+        }
+
+        // Initialize chat UI when the page loads
+        document.addEventListener("DOMContentLoaded", () => {
+            new ChatUI();
+        });
+    </script>
+</body>
+</html>
