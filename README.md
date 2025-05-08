@@ -25,9 +25,3 @@ A ChatGPT-like chatbot built with Python and Flask that uses LangChain and Llama
 - GPU (Optional, but highly recommended for running large models like Llama 3)
 - Required Python libraries (see [Installation](#installation))
 
-## Installation
-
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/yourusername/wikipedia-chatbot.git
-   cd wikipedia-chatbot
